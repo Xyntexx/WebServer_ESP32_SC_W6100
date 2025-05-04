@@ -517,7 +517,7 @@ static void emac_w6100_task(void *arg)
     {
       status = W6100_SIR_RECV;
       // clear interrupt status
-      w6100_write(emac, W6100_REG_SOCK_IR(0), &status, sizeof(status));
+      w6100_write(emac, W6100_REG_SOCK_IR_CLR(0), &status, sizeof(status));
 
       do
       {
@@ -809,7 +809,7 @@ static esp_err_t emac_w6100_transmit(esp_eth_mac_t *mac, uint8_t *buf, uint32_t 
 
   // clear the event bit
   status  = W6100_SIR_SEND;
-  ESP_GOTO_ON_ERROR(w6100_write(emac, W6100_REG_SOCK_IR(0), &status, sizeof(status)), err, TAG, "Write SOCK0 IR failed");
+  ESP_GOTO_ON_ERROR(w6100_write(emac, W6100_REG_SOCK_IR_CLR(0), &status, sizeof(status)), err, TAG, "Write SOCK0 IR failed");
 
 err:
   return ret;

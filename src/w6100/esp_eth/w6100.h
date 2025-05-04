@@ -83,6 +83,7 @@
 #define W6100_REG_SOCK_MR(s)         W6100_MAKE_MAP(0x0000, W6100_BSB_SOCK_REG(s)) // Socket Mode
 #define W6100_REG_SOCK_CR(s)         W6100_MAKE_MAP(0x0010, W6100_BSB_SOCK_REG(s)) // Socket Command
 #define W6100_REG_SOCK_IR(s)         W6100_MAKE_MAP(0x0020, W6100_BSB_SOCK_REG(s)) // Socket Interrupt
+#define W6100_REG_SOCK_IR_CLR(s)	 W6100_MAKE_MAP(0x0028, W6100_BSB_SOCK_REG(s)) // Socket Interrupt Clear
 #define W6100_REG_SOCK_SR(s)         W6100_MAKE_MAP(0x0030, W6100_BSB_SOCK_REG(s)) // Socket Status
 
 #define W6100_REG_SOCK_RXBUF_SIZE(s) W6100_MAKE_MAP(0x0220, W6100_BSB_SOCK_REG(s)) // Socket Receive Buffer Size
