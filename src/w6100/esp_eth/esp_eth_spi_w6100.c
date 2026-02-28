@@ -84,11 +84,15 @@ esp_eth_mac_t* w6100_new_mac( spi_device_handle_t *spi_handle, int INT_GPIO )
 esp_eth_mac_t* w6100_begin(int MISO_GPIO, int MOSI_GPIO, int SCLK_GPIO, int CS_GPIO, int INT_GPIO, int SPICLOCK_MHZ,
                            int SPIHOST)
 {
-  if (ESP_OK != gpio_install_isr_service(0))
   {
-    ESP_LOGE(TAG, "%s(%d): Error gpio_install_isr_service", __FUNCTION__, __LINE__);
+    esp_err_t isr_err = gpio_install_isr_service(0);
 
-    return NULL;
+    if (isr_err != ESP_OK && isr_err != ESP_ERR_INVALID_STATE)
+    {
+      ESP_LOGE(TAG, "%s(%d): Error gpio_install_isr_service: %d", __FUNCTION__, __LINE__, isr_err);
+
+      return NULL;
+    }
   }
 
   /* w6100 ethernet driver is based on spi driver */
