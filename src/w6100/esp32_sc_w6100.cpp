@@ -420,6 +420,28 @@ IPv6Address ESP32_W6100::localIPv6()
 
 ////////////////////////////////////////
 
+bool ESP32_W6100::restartNegotiation()
+{
+#ifdef ESP_IDF_VERSION_MAJOR
+  if (!eth_handle)
+  {
+    return false;
+  }
+
+  // esp_eth_stop() halts the MAC/link timer; esp_eth_start() re-triggers
+  // phy->autonego_ctrl(phy, ESP_ETH_PHY_AUTONEGO_RESTART, ...) internally
+  // (see esp-idf esp_eth.c) without recreating the driver/task, unlike
+  // begin(). Stop can return ESP_ERR_INVALID_STATE if already stopped
+  // (e.g. link never came up) — that's fine, start() is what matters.
+  esp_eth_stop(eth_handle);
+  return esp_eth_start(eth_handle) == ESP_OK;
+#else
+  return false;
+#endif
+}
+
+////////////////////////////////////////
+
 uint8_t * ESP32_W6100::macAddress(uint8_t* mac)
 {
   if (!mac)

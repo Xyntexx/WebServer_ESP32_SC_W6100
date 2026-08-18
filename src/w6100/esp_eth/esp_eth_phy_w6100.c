@@ -81,7 +81,14 @@ typedef struct
   uint32_t autonego_timeout_ms;
   eth_link_t link_status;
   int reset_gpio_num;
+  TickType_t force_mode_set_tick; // when forced 100M-FD mode was applied
+  bool reverted_to_autoneg;       // whether we've fallen back to opmode=7
 } phy_w6100_t;
+
+// If forcing a fixed link mode doesn't produce a link within this window,
+// fall back to normal autonegotiation so a wrong register guess fails safe
+// instead of leaving the PHY stuck in an unverified mode indefinitely.
+#define W6100_FORCE_MODE_FALLBACK_MS 10000
 
 ////////////////////////////////////////
 
@@ -165,6 +172,25 @@ static esp_err_t w6100_get_link(esp_eth_phy_t *phy)
   /* Updata information about link, speed, duplex */
   ESP_GOTO_ON_ERROR(w6100_update_link_duplex_speed(w6100), err, TAG, "Update link duplex speed failed");
 
+  // Safety fallback: if we forced a fixed link mode and it hasn't produced
+  // a link within the fallback window, revert to normal autonegotiation.
+  // Keeps a wrong register-value guess from leaving the PHY stuck forever.
+  if (!w6100->reverted_to_autoneg && w6100->link_status != ETH_LINK_UP &&
+      w6100->force_mode_set_tick != 0 &&
+      (xTaskGetTickCount() - w6100->force_mode_set_tick) >= pdMS_TO_TICKS(W6100_FORCE_MODE_FALLBACK_MS))
+  {
+    esp_eth_mediator_t *eth = w6100->eth;
+    phycfg_reg_t phycfg;
+    ESP_GOTO_ON_ERROR(eth->phy_reg_read(eth, w6100->addr, W6100_REG_PHYCFGR, (uint32_t *) & (phycfg.val)), err, TAG,
+                      "Read PHYCFG failed");
+    phycfg.opsel = 1;
+    phycfg.opmode = 7; // back to all-capable autonegotiation
+    ESP_GOTO_ON_ERROR(eth->phy_reg_write(eth, w6100->addr, W6100_REG_PHYCFGR, phycfg.val), err, TAG, "Write PHYCFG failed");
+    w6100->reverted_to_autoneg = true;
+    ESP_LOGW(TAG, "forced 100M-FD mode produced no link after %dms, reverted to autonegotiation",
+             W6100_FORCE_MODE_FALLBACK_MS);
+  }
+
   return ESP_OK;
 
 err:
@@ -231,13 +257,23 @@ static esp_err_t w6100_negotiate(esp_eth_phy_t *phy)
 
   /* in case any link status has changed, let's assume we're in link down status */
   w6100->link_status = ETH_LINK_DOWN;
+
   phycfg_reg_t phycfg;
   ESP_GOTO_ON_ERROR(eth->phy_reg_read(eth, w6100->addr, W6100_REG_PHYCFGR, (uint32_t *) & (phycfg.val)), err, TAG,
                     "Read PHYCFG failed");
 
   phycfg.opsel = 1;  // PHY working mode configured by register
-  phycfg.opmode = 7; // all capable, auto-negotiation enabled
+  // Force 100M full-duplex instead of "all capable, auto-negotiation
+  // enabled" (opmode=7) — the link partner's autonegotiation has been
+  // observed taking 10-20+ minutes (or never completing) against this
+  // chip, while both sides support 100M-FD reliably once actually linked.
+  // w6100_get_link() reverts this to opmode=7 automatically if no link
+  // appears within W6100_FORCE_MODE_FALLBACK_MS, in case this opmode
+  // value turns out to be wrong for this chip.
+  phycfg.opmode = 3; // 100BT full-duplex, auto-negotiation disabled
   ESP_GOTO_ON_ERROR(eth->phy_reg_write(eth, w6100->addr, W6100_REG_PHYCFGR, phycfg.val), err, TAG, "Write PHYCFG failed");
+  w6100->force_mode_set_tick = xTaskGetTickCount();
+  w6100->reverted_to_autoneg = false;
 
   return ESP_OK;
 

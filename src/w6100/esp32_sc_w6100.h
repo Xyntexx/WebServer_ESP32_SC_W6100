@@ -93,6 +93,16 @@ class ESP32_W6100
     uint8_t * macAddress(uint8_t* mac);
     String macAddress();
 
+    // Local patch: esp_eth's autonegotiation is only ever triggered once,
+    // inside esp_eth_start() (see esp-idf esp_eth.c) — the periodic link
+    // timer only polls phy->get_link(), it never retries negotiation.
+    // W6100's PHY doesn't keep retrying on its own either, so a failed
+    // first attempt is permanent until esp_eth_start() runs again. This
+    // exposes a cheap stop+start cycle (re-triggers PHY autonego_ctrl)
+    // without the full begin() reinit, which creates a new FreeRTOS task
+    // each time and can't be called repeatedly.
+    bool restartNegotiation();
+
     friend class WiFiClient;
     friend class WiFiServer;
 };
